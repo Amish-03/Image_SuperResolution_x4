@@ -22,7 +22,7 @@ import sys
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 # Add the SwinIR repo to path so we can import the model
@@ -44,13 +44,14 @@ def parse_args():
     p.add_argument("--scale", type=int, default=4)
     p.add_argument("--patch_size", type=int, default=48,
                    help="LR patch size (HR = patch_size x scale)")
-    p.add_argument("--batch_size", type=int, default=8)
+    p.add_argument("--batch_size", type=int, default=2)
     p.add_argument("--epochs", type=int, default=500)
     p.add_argument("--lr", type=float, default=2e-4)
     p.add_argument("--num_workers", type=int, default=4)
     p.add_argument("--seed", type=int, default=2026)
     p.add_argument("--checkpoint_dir", type=str, default="./checkpoints_swinir")
-    p.add_argument("--val_every", type=int, default=5)
+    p.add_argument("--val_every", type=int, default=15)
+    p.add_argument("--val_size", type=int, default=20, help="Number of validation images to use")
     p.add_argument("--resume", type=str, default=None)
 
     # SwinIR architecture args
@@ -98,6 +99,14 @@ def train(args):
                             subset="train", patch_size=args.patch_size)
     valid_ds = DIV2KDataset(args.dataset_dir, scale=args.scale,
                             subset="valid")
+    
+    # Use distinct random subset for validation to speed up
+    if args.val_size > 0 and len(valid_ds) > args.val_size:
+        # Fixed permutation based on seed for consistency across runs
+        # (Note: set_random_seed is called at start of train function)
+        indices = torch.randperm(len(valid_ds))[:args.val_size]
+        valid_ds = Subset(valid_ds, indices)
+        print(f"  [valid] Using random subset of {len(valid_ds)} images")
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size,
                               shuffle=True, num_workers=args.num_workers,

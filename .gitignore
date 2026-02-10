@@ -21,3 +21,6 @@ build/
 # OS
 Thumbs.db
 .DS_Store
+
+# Large files
+checkpoints_swinir/best_model.pth
